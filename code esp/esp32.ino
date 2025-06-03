@@ -68,5 +68,5 @@ void loop()
     digitalWrite(CONTROL_PIN, LOW); // Mặc định chân ở mức LOW
   }
 
-  delay(100);
+  delay(250);
 }

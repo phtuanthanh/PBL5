@@ -53,7 +53,7 @@ async def handle_client(websocket):
                     
                     # Gửi tín hiệu "stop" đến tất cả client (bao gồm ESP8266)
                     for client in clients:
-                        if client.remote_address[0]=='192.168.137.155':
+                        if client.remote_address[0]=='192.168.137.232':
                             await client.send("stop")
                     
                     break  # Kết thúc vòng lặp khi train xong
