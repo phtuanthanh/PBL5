@@ -97,7 +97,7 @@ void connectToWebSocket()
     if (connected)
     {
         Serial.println("Connected to WebSocket server!");
-        client.send("Hello Server");
+        client.send("esp32cam");
         client.onMessage(handleMessage);
     }
     else
