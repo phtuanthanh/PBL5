@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import uuid
 import os
+import time
 from ultralytics import YOLO
 import cv2
 from collections import deque
@@ -45,7 +46,6 @@ def detect_board(image):
 # ====================== Xử Lý ESP32 ======================
 async def handle_esp32_client(websocket):
     esp32_clients.add(websocket)
-    count = 0
     # Khởi tạo map với giá trị ban đầu là 0
     detection_map = {
         "A1": 0,
@@ -53,6 +53,7 @@ async def handle_esp32_client(websocket):
         "B1": 0,
         "B2": 0
     }
+    start_time = time.time()
     
     try:
         message = await websocket.recv()
@@ -61,25 +62,31 @@ async def handle_esp32_client(websocket):
             await asyncio.sleep(1)
             await websocket.send("capture")
         STT = 1
+        car_status ="moving"
+        notify_flutter_clients(None, car_status)
         while True:
             message = await websocket.recv()
             
-            # Xử lý tín hiệu renew
+           
             if isinstance(message, str) and message == "renew":
-                # Reset map về giá trị ban đầu
                 detection_map = {
                     "A1": 0,
                     "A2": 0,
                     "B1": 0,
                     "B2": 0
                 }
-                count = 0
+                start_time = time.time()
                 print("[🔄] Map renewed")
                 continue
                 
             # Xử lý ảnh
             if isinstance(message, bytes):
                 # Lưu ảnh
+                car_status = "moving"
+                for client in flutter_clients:
+                    client.send(json.dumps({
+                        "status": car_status
+                    }))
                 filename = str(STT) + ".jpg"
                 filepath = os.path.join(DIRECTORY, filename)
                 STT+=1
@@ -93,25 +100,30 @@ async def handle_esp32_client(websocket):
                     # Tăng giá trị trong map
                     if detected_class in detection_map:
                         detection_map[detected_class] += 1
-                        count += 1
+                      
                         print(f"[📊] Current map: {detection_map}")
                         
-                        # Tìm key có giá trị lớn nhất
-                        max_key = max(detection_map.items(), key=lambda x: x[1])[0]
-                        max_value = detection_map[max_key]
-                        
-                        # Kiểm tra nếu key có giá trị max trùng với bàn đầu tiên trong queue
-                        if keyword_queue and max_key == keyword_queue[0] and count >= 3:
-                            print(f"[🛑] Sending stop signal for {max_key}")
-                            await websocket.send("stop")
-                            # Reset map sau khi gửi tín hiệu stop
-                            detection_map = {
-                                "A1": 0,
-                                "A2": 0,
-                                "B1": 0,
-                                "B2": 0
-                            }
-                            count = 0
+                        if time.time() - start_time > 3 and max(detection_map.values()) > 0:   #kieemr tra nen sua hay k
+                            # Tìm key có giá trị lớn nhất
+                            max_key = max(detection_map.items(), key=lambda x: x[1])[0]
+                            max_value = detection_map[max_key]
+                            # Kiểm tra nếu key có giá trị max trùng với bàn đầu tiên trong queue
+                            if keyword_queue and max_key == keyword_queue[0] :
+                                print(f"[🛑] Sending stop signal for {max_key}")
+                                await websocket.send("stop")
+                                # Reset map sau khi gửi tín hiệu stop
+                                detection_map = {
+                                    "A1": 0,
+                                    "A2": 0,
+                                    "B1": 0,
+                                    "B2": 0
+                                }
+                                if keyword_queue:
+                                    keyword_queue.popleft()
+                                #send to flutter, current table
+                                car_status = "stopping"
+                                await notify_flutter_clients(max_key, car_status)
+                                start_time = time.time()
                 else:
                     print("[⚠️] No object detected.")
 
@@ -174,6 +186,17 @@ async def main():
     server = await websockets.serve(handle_client, HOST, PORT)
     print(f"[🚀] Server running on ws://{HOST}:{PORT}")
     await server.wait_closed()
+
+async def notify_flutter_clients(keyword, status):
+    message = json.dumps({
+        "keyword": keyword,
+        "status": status
+    })
+    for client in flutter_clients:
+        try:
+            await client.send(message)
+        except:
+            pass
 
 if __name__ == "__main__":
     asyncio.run(main())
