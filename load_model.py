@@ -54,7 +54,6 @@ async def handle_esp32_client(websocket):
         "B2": 0
     }
     start_time = time.time()
-    
     try:
         message = await websocket.recv()
         if isinstance(message, str) and message == "esp32cam":
@@ -62,12 +61,8 @@ async def handle_esp32_client(websocket):
             await asyncio.sleep(1)
             await websocket.send("capture")
         STT = 1
-        car_status ="moving"
-        notify_flutter_clients(None, car_status)
         while True:
             message = await websocket.recv()
-            
-           
             if isinstance(message, str) and message == "renew":
                 detection_map = {
                     "A1": 0,
@@ -77,16 +72,13 @@ async def handle_esp32_client(websocket):
                 }
                 start_time = time.time()
                 print("[🔄] Map renewed")
+                await notify_flutter_clients(None, "moving")
                 continue
                 
             # Xử lý ảnh
             if isinstance(message, bytes):
                 # Lưu ảnh
-                car_status = "moving"
-                for client in flutter_clients:
-                    client.send(json.dumps({
-                        "status": car_status
-                    }))
+           
                 filename = str(STT) + ".jpg"
                 filepath = os.path.join(DIRECTORY, filename)
                 STT+=1
@@ -121,8 +113,8 @@ async def handle_esp32_client(websocket):
                                 if keyword_queue:
                                     keyword_queue.popleft()
                                 #send to flutter, current table
-                                car_status = "stopping"
-                                await notify_flutter_clients(max_key, car_status)
+                            
+                                await notify_flutter_clients(max_key, "stopping")
                                 start_time = time.time()
                 else:
                     print("[⚠️] No object detected.")

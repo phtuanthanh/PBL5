@@ -5,11 +5,14 @@
 const char *ssid = "Hades";
 const char *password = "congchua";                               // Enter WiFi password
 const char *websockets_server_host = "ws://192.168.137.1:5000/"; // Enter WebSocket server address
+const int stopOut_pin = 2;
 
 using namespace websockets;
 using eloq::camera;
 
 WebsocketsClient client;
+unsigned long stopStartTime = 0;
+bool isStopped = false;
 
 void connectToWiFi();
 void connectToWebSocket();
@@ -19,6 +22,8 @@ void captureImage();
 void setup()
 {
     Serial.begin(115200);
+    pinMode(stopOut_pin, OUTPUT);
+    digitalWrite(stopOut_pin, LOW);
     delay(3000);
     Serial.println("___ESP32 CAM with WebSocket___");
     connectToWiFi();
@@ -57,6 +62,14 @@ void loop()
     if (Serial.available() && Serial.readStringUntil('\n') == "capture")
     {
         captureImage();
+    }
+
+    // Check if stop timer has expired
+    if (isStopped && (millis() - stopStartTime >= 10000)) {
+        digitalWrite(stopOut_pin, LOW);
+        client.send("renew");
+        isStopped = false;
+        Serial.println("Stop timer expired, sending renew signal");
     }
 
     // Listen for messages from WebSocket server
@@ -117,6 +130,13 @@ void handleMessage(WebsocketsMessage message)
     if (message.data() == "capture")
     {
         captureImage();
+    }
+    else if (message.data() == "stop")
+    {
+        digitalWrite(stopOut_pin, HIGH);
+        stopStartTime = millis();
+        isStopped = true;
+        Serial.println("Stop signal received, pin set HIGH");
     }
 }
 
