@@ -144,11 +144,10 @@ async def handle_flutter_client(websocket):
                         await websocket.send(json.dumps({
                             "keyword": message,
                             "status": "success",
-                            "queue_size": len(keyword_queue)
                         }))
-                        print(f"[✅] Received keyword: {message}, Queue size: {len(keyword_queue)}")
+                        print(f"[✅] Received keyword: {message}")
                     else:
-                        print(f"[⚠️] Invalid keyword received: {message}")
+                        print(f"[⚠️] Invalid keyword received: {mesasage}")
                 except Exception as e:
                     print(f"[❌] Error processing message: {str(e)}")
     except websockets.exceptions.ConnectionClosed:
@@ -182,7 +181,7 @@ async def main():
 async def notify_flutter_clients(keyword, status):
     message = json.dumps({
         "keyword": keyword,
-        "status": status
+        "car_status": status
     })
     for client in flutter_clients:
         try:
