@@ -55,11 +55,9 @@ async def handle_esp32_client(websocket):
     }
     start_time = time.time()
     try:
-        message = await websocket.recv()
-        if isinstance(message, str) and message == "esp32cam":
-            await websocket.send("Hello ESP32-CAM")
-            await asyncio.sleep(1)
-            await websocket.send("capture")
+        await websocket.send("Hello ESP32-CAM")
+        await asyncio.sleep(1)
+        await websocket.send("capture")
         STT = 1
         while True:
             message = await websocket.recv()

@@ -8,8 +8,8 @@ const char *serverUrl = "ws://192.168.137.1:5000"; // Địa chỉ WebSocket Ser
 using namespace websockets;
 WebsocketsClient client;
 
-#define CONTROL_PIN 5       // Chân GPIO cần điều khiển
-bool stop_received = false; // Biến đánh dấu nhận được tín hiệu "stop"
+#define STOP_PIN 5       // Chân GPIO cần điều khiển
+bool stop_received = false;
 
 void onMessageCallback(WebsocketsMessage message)
 {
@@ -18,7 +18,19 @@ void onMessageCallback(WebsocketsMessage message)
 
   if (message.data() == "stop")
   {
-    stop_received = true; // Cập nhật trạng thái nhận lệnh
+    stop_received = true; 
+  }
+}
+void sendMessage(const String &message)
+{
+  if (client.available())
+  {
+    client.send(message);
+    Serial.println("Sent: " + message);
+  }
+  else
+  {
+    Serial.println("WebSocket not available for sending messages.");
   }
 }
 
@@ -34,7 +46,7 @@ void setup()
   }
   Serial.println("\nConnected to WiFi!");
 
-  pinMode(CONTROL_PIN, OUTPUT);
+  pinMode(STOP_PIN, OUTPUT);
 
   client.onMessage(onMessageCallback);
 
@@ -63,10 +75,12 @@ void loop()
 
   if (stop_received)
   {
-    digitalWrite(CONTROL_PIN, HIGH); // Bật GPIO 5
-    delay(500);
-    digitalWrite(CONTROL_PIN, LOW); // Mặc định chân ở mức LOW
+    digitalWrite(STOP_PIN, HIGH); // Bật GPIO 5
+    delay(5000);
+    digitalWrite(STOP_PIN, LOW); // Mặc định chân ở mức LOW
+    stop_received = false; // Đặt lại cờ sau khi đã xử lý lệnh
+   sendMessage("renew");
   }
 
-  delay(250);
+  delay(100);
 }
