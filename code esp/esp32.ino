@@ -78,7 +78,7 @@ void loop()
     digitalWrite(STOP_PIN, HIGH); // Bật GPIO 5
     delay(5000);
     digitalWrite(STOP_PIN, LOW); // Mặc định chân ở mức LOW
-    stop_received = false; // Đặt lại cờ sau khi đã xử lý lệnh
+    stop_received = false;
    sendMessage("renew");
   }
 
