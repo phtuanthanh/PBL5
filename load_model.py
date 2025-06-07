@@ -19,6 +19,7 @@ ESP32_IP = "192.168.137.232"
 # Tách riêng clients theo loại
 esp32_clients = set()
 flutter_clients = set()
+esp8266_clients = set()  # Thêm set cho ESP8266 clients
 
 # Hàng đợi FIFO cho các từ khóa
 keyword_queue = deque()
@@ -42,38 +43,20 @@ def detect_board(image):
         class_id = int(result.boxes[0].cls[0])
         detected_class = result.names[class_id]
     return detected_class
-
+for key in detection_map.keys():
+    detection_map[key] = 0
 # ====================== Xử Lý ESP32 ======================
 async def handle_esp32_client(websocket):
     esp32_clients.add(websocket)
     # Khởi tạo map với giá trị ban đầu là 0
-    detection_map = {
-        "A1": 0,
-        "A2": 0,
-        "B1": 0,
-        "B2": 0
-    }
     start_time = time.time()
     try:
-        message = await websocket.recv()
-        if isinstance(message, str) and message == "esp32cam":
-            await websocket.send("Hello ESP32-CAM")
-            await asyncio.sleep(1)
-            await websocket.send("capture")
+        await websocket.send("Hello ESP32-CAM")
+        await asyncio.sleep(1)
+        await websocket.send("capture")
         STT = 1
         while True:
             message = await websocket.recv()
-            if isinstance(message, str) and message == "renew":
-                detection_map = {
-                    "A1": 0,
-                    "A2": 0,
-                    "B1": 0,
-                    "B2": 0
-                }
-                start_time = time.time()
-                print("[🔄] Map renewed")
-                await notify_flutter_clients(None, "moving")
-                continue
                 
             # Xử lý ảnh
             if isinstance(message, bytes):
@@ -147,13 +130,35 @@ async def handle_flutter_client(websocket):
                         }))
                         print(f"[✅] Received keyword: {message}")
                     else:
-                        print(f"[⚠️] Invalid keyword received: {mesasage}")
+                        print(f"[⚠️] Invalid keyword received: {message}")
                 except Exception as e:
                     print(f"[❌] Error processing message: {str(e)}")
     except websockets.exceptions.ConnectionClosed:
         print("[❌] Flutter client disconnected")
     finally:
         flutter_clients.remove(websocket)
+
+# ====================== Xử Lý ESP8266 ======================
+async def handle_esp8266_client(websocket):
+    esp8266_clients.add(websocket)
+    try:
+        await websocket.send("Hello ESP8266")
+        while True:
+            message = await websocket.recv()
+            if message == "renew":
+                detection_map = {
+                    "A1": 0,
+                    "A2": 0,
+                    "B1": 0,
+                    "B2": 0
+                }
+                print("renewed")
+                await notify_flutter_clients(None, "moving")
+                continue
+    except websockets.exceptions.ConnectionClosed:
+        print("[❌] ESP8266 disconnected")
+    finally:
+        esp8266_clients.remove(websocket)
 
 # ====================== Xử Lý Client ======================
 async def handle_client(websocket):
@@ -162,10 +167,12 @@ async def handle_client(websocket):
         message = await websocket.recv()
         
         if isinstance(message, str):
-            if message == "esp32cam":
+            if message == "Hello Server":
                 await handle_esp32_client(websocket)
             elif message == "flutter":
                 await handle_flutter_client(websocket)
+            elif message == "esp8266":  # Thêm xử lý cho ESP8266
+                await handle_esp8266_client(websocket)
             else:
                 print(f"[⚠️] Unknown client type: {message}")
                 await websocket.close()
