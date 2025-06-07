@@ -69,7 +69,7 @@ void loop()
   }
   else
   {
-    Serial.println("Reconnecting WebSocket...");
+    Serial.println("Reconnecting WebSocket......");
     client.connect(serverUrl); // Thử kết nối lại nếu mất kết nối
   }
 
