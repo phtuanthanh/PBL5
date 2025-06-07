@@ -15,7 +15,12 @@ PORT = 5000
 DIRECTORY = "image_esp32cam"
 MODEL_PATH = "best (2).pt"
 ESP32_IP = "192.168.137.232"
-
+detection_map = {
+            "A1": 0,
+            "A2": 0,
+            "B1": 0,
+            "B2": 0
+        }
 # Tách riêng clients theo loại
 esp32_clients = set()
 flutter_clients = set()
@@ -87,12 +92,8 @@ async def handle_esp32_client(websocket):
                                 print(f"[🛑] Sending stop signal for {max_key}")
                                 await websocket.send("stop")
                                 # Reset map sau khi gửi tín hiệu stop
-                                detection_map = {
-                                    "A1": 0,
-                                    "A2": 0,
-                                    "B1": 0,
-                                    "B2": 0
-                                }
+                            for key in detection_map.keys():
+                                detection_map[key] = 0
                                 if keyword_queue:
                                     keyword_queue.popleft()
                                 #send to flutter, current table
