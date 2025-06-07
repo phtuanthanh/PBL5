@@ -40,7 +40,6 @@ model = YOLO(MODEL_PATH)
 
 # ====================== Hàm Nhận Diện ======================
 def detect_board(image):
-    model = YOLO("best (2).pt")
     results = model(image, conf=0.3, imgsz=640)
     result = results[0]
     detected_class = None
@@ -48,8 +47,13 @@ def detect_board(image):
         class_id = int(result.boxes[0].cls[0])
         detected_class = result.names[class_id]
     return detected_class
-for key in detection_map.keys():
-    detection_map[key] = 0
+def send_stop_to_esp8266():
+    for client in esp8266_clients:
+        try:
+            asyncio.create_task(client.send("stop"))
+        except websockets.exceptions.ConnectionClosed:
+            print("ESP8266 client disconnected")
+            esp8266_clients.remove(client)
 # ====================== Xử Lý ESP32 ======================
 async def handle_esp32_client(websocket):
     esp32_clients.add(websocket)
@@ -90,10 +94,7 @@ async def handle_esp32_client(websocket):
                             # Kiểm tra nếu key có giá trị max trùng với bàn đầu tiên trong queue
                             if keyword_queue and max_key == keyword_queue[0] :
                                 print(f"[🛑] Sending stop signal for {max_key}")
-                                await websocket.send("stop")
-                                # Reset map sau khi gửi tín hiệu stop
-                            for key in detection_map.keys():
-                                detection_map[key] = 0
+                                await send_stop_to_esp8266()
                                 if keyword_queue:
                                     keyword_queue.popleft()
                                 #send to flutter, current table
