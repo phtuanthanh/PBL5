@@ -40,13 +40,18 @@ model = YOLO(MODEL_PATH)
 
 # ====================== Hàm Nhận Diện ======================
 def detect_board(image):
-    results = model(image, conf=0.3, imgsz=640)
-    result = results[0]
-    detected_class = None
-    if len(result.boxes) > 0:
-        class_id = int(result.boxes[0].cls[0])
-        detected_class = result.names[class_id]
-    return detected_class
+    try:
+        results = model(image, conf=0.3, imgsz=640)
+        result = results[0]
+        detected_class = None
+        if len(result.boxes) > 0:
+            class_id = int(result.boxes[0].cls[0])
+            detected_class = result.names[class_id]
+        return detected_class
+    except Exception as e:
+        print(f"[❌] Error in detection: {str(e)}")
+        return None
+# ====================== Gửi tín hiệu dừng đến ESP8266 ======================
 def send_stop_to_esp8266():
     for client in esp8266_clients:
         try:
@@ -60,7 +65,7 @@ async def handle_esp32_client(websocket):
     # Khởi tạo map với giá trị ban đầu là 0
     start_time = time.time()
     try:
-        await websocket.send("Hello ESP32-CAM")
+       # await websocket.send("Hello ESP32-CAM")
         await asyncio.sleep(1)
         await websocket.send("capture")
         STT = 1
@@ -142,18 +147,15 @@ async def handle_flutter_client(websocket):
 
 # ====================== Xử Lý ESP8266 ======================
 async def handle_esp8266_client(websocket):
+    print("[🔄] New ESP8266 client connected")
     esp8266_clients.add(websocket)
     try:
         await websocket.send("Hello ESP8266")
         while True:
             message = await websocket.recv()
             if message == "renew":
-                detection_map = {
-                    "A1": 0,
-                    "A2": 0,
-                    "B1": 0,
-                    "B2": 0
-                }
+                for key in detection_map:
+                    detection_map[key] = 0
                 print("renewed")
                 await notify_flutter_clients(None, "moving")
                 continue
@@ -173,7 +175,7 @@ async def handle_client(websocket):
                 await handle_esp32_client(websocket)
             elif message == "flutter":
                 await handle_flutter_client(websocket)
-            elif message == "esp8266":  # Thêm xử lý cho ESP8266
+            elif message == "esp8266": 
                 await handle_esp8266_client(websocket)
             else:
                 print(f"[⚠️] Unknown client type: {message}")

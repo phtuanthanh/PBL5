@@ -7,80 +7,87 @@ const char *serverUrl = "ws://192.168.137.1:5000"; // Địa chỉ WebSocket Ser
 
 using namespace websockets;
 WebsocketsClient client;
+#define STOP_PIN 5
+#define STOP_DURATION 5000  
+#define RECONNECT_DELAY 5000  
+#define LOOP_DELAY 100
+
 
 #define STOP_PIN 5       // Chân GPIO cần điều khiển
 bool stop_received = false;
+unsigned long last_reconnect_attempt = 0;
+void onMessageCallback(WebsocketsMessage message) {
+    Serial.print("Received: ");
+    Serial.println(message.data());
 
-void onMessageCallback(WebsocketsMessage message)
-{
-  Serial.print("Received: ");
-  Serial.println(message.data());
-
-  if (message.data() == "stop")
-  {
-    stop_received = true; 
-  }
-}
-void sendMessage(const String &message)
-{
-  if (client.available())
-  {
-    client.send(message);
-    Serial.println("Sent: " + message);
-  }
-  else
-  {
-    Serial.println("WebSocket not available for sending messages.");
-  }
+    if (message.data() == "stop") {
+        stop_received = true;
+    }
 }
 
-void setup()
-{
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
+void sendMessage(const String &message) {
+    if (client.available()) {
+        client.send(message);
+        Serial.println("Sent: " + message);
+    } else {
+        Serial.println("WebSocket not available for sending messages.");
+    }
+}
+void setup() {
+    Serial.begin(115200);
+    
+    // Khởi tạo GPIO
+    pinMode(STOP_PIN, OUTPUT);
+    digitalWrite(STOP_PIN, LOW);  // Đảm bảo trạng thái mặc định là LOW
+    
+    // Kết nối WiFi
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConnected to WiFi!");
 
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nConnected to WiFi!");
-
-  pinMode(STOP_PIN, OUTPUT);
-
-  client.onMessage(onMessageCallback);
-
-  Serial.println("Connecting to WebSocket Server...");
-  if (client.connect(serverUrl))
-  {
-    Serial.println("Connected to Server!");
-  }
-  else
-  {
-    Serial.println("WebSocket connection failed.");
-  }
+    // Cấu hình WebSocket
+    client.onMessage(onMessageCallback);
+    
+    // Kết nối WebSocket
+    Serial.println("Connecting to WebSocket Server...");
+    if (client.connect(serverUrl)) {
+        Serial.println("Connected to Server!");
+        sendMessage("esp8266");  // Gửi tin nhắn phân loại client
+    } else {
+        Serial.println("WebSocket connection failed.");
+    }
 }
 
-void loop()
-{
-  if (client.available())
-  {
-    client.poll(); // Nhận tin nhắn từ server
-  }
-  else
-  {
-    Serial.println("Reconnecting WebSocket......");
-    client.connect(serverUrl); // Thử kết nối lại nếu mất kết nối
-  }
 
-  if (stop_received)
-  {
-    digitalWrite(STOP_PIN, HIGH); // Bật GPIO 5
-    delay(5000);
-    digitalWrite(STOP_PIN, LOW); // Mặc định chân ở mức LOW
-    stop_received = false;
-   sendMessage("renew");
-  }
+void loop() {
+    // Xử lý WebSocket
+    if (client.available()) {
+        client.poll();
+    } else {
+        // Thử kết nối lại sau mỗi RECONNECT_DELAY
+        unsigned long current_time = millis();
+        if (current_time - last_reconnect_attempt >= RECONNECT_DELAY) {
+            Serial.println("Reconnecting WebSocket...");
+            if (client.connect(serverUrl)) {
+                Serial.println("Reconnected!");
+                sendMessage("esp8266");  // Gửi lại tin nhắn phân loại
+            }
+            last_reconnect_attempt = current_time;
+        }
+    }
 
-  delay(100);
+    // Xử lý tín hiệu dừng
+    if (stop_received) {
+        digitalWrite(STOP_PIN, HIGH);
+        delay(STOP_DURATION);
+        digitalWrite(STOP_PIN, LOW);
+        stop_received = false;
+        sendMessage("renew");
+    }
+
+    delay(LOOP_DELAY);
 }
