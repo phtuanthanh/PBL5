@@ -7,13 +7,13 @@ const char *serverUrl = "ws://192.168.137.1:5000"; // Địa chỉ WebSocket Ser
 
 using namespace websockets;
 WebsocketsClient client;
-#define STOP_PIN 5
+#define STOP_PIN 14
 #define STOP_DURATION 5000  
 #define RECONNECT_DELAY 5000  
 #define LOOP_DELAY 100
 
 
-#define STOP_PIN 5       // Chân GPIO cần điều khiển
+
 bool stop_received = false;
 unsigned long last_reconnect_attempt = 0;
 void onMessageCallback(WebsocketsMessage message) {
